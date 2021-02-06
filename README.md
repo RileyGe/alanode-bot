@@ -45,7 +45,7 @@ python main.py
 
  - 添加自定义机器人：建群后在**电脑端**（现阶段手机不支持此功能）打开群设置->智能群助手->添加机器人->自定义->添加。然后你就可以设置机器人的名字、图片、添加到哪个群等信息。设置完成后直接单击下一步。下一步中会要求进行安全设置，我们选择**加签**，然后将签名信息写入到`config.ini`的`[dingding]`类别的`secret`项中。如下图所示。然后单击完成。在完成界面上会显示机器人的Webhook，复制Webhook添加到`config.ini`的`[dingding]`类别的`webhook`项中。这样就完成了钉钉的设置。
    
-   ![add-dingding-bot](static\add-dingding-bot.png)
+![add-dingding-bot](static/add-dingding-bot.png)
 
 ### 2.2、邮箱
 
@@ -58,7 +58,7 @@ python main.py
 
 首先进入设置->POP3/SMTP/IMAP，如下图所示：
 
-![163邮箱设置](D:\git\alanode-bot\static\enter-mail-setting.png)
+![163邮箱设置](static/enter-mail-setting.png)
 
 进入之后开启“POP3/SMTP”服务。在开启时需要发送短信，开启后会显示授权密码。请将此密码放到`config.ini`文件，`mail`类别的`psd`项中。然后修改自己的`eamil`地址，修改邮件地址名称（只在发邮件时起显示发件人信息之用）。
 
