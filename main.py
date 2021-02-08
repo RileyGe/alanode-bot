@@ -98,65 +98,89 @@ with open(cf.get('app', 'node_info_file'), 'r') as f:
         watching_nodes[info.id] = info
         print(time_str, info.id, info.dingding, info.mail)
 send_msg('Alaya预警正在运行！')
+shares_increase_threshold = int(cf.get('alert_type', 'shares_increase_threshold')) * 10**18
+shares_reduce_threshold = int(cf.get('alert_type', 'shares_reduce_threshold')) * 10**18
+# 排名上升达到阈值进行提醒，-1表示永不提醒
+rank_increase_threshold = int(cf.get('alert_type', 'rank_increase_threshold'))
+# 排名下降达到阈值后进行提醒，-1为不提醒
+rank_reduce_threshold = int(cf.get('alert_type', 'rank_reduce_threshold'))
+# 排名达到阈值或阈值之后进行提醒，-1为不提醒
+rank_threshold = int(cf.get('alert_type', 'rank_threshold'))
+# 是否对状态改变进行提醒，true为提醒，false为不提醒
+status_enable = cf.get('alert_type', 'status_enable')
 while True:
-    res_json = json.loads(alaya_nodes())
-    node_length = len(res_json["Ret"])
-    if res_json["Code"] == 0 and node_length > 0:
-        time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
-        print(time_str, "节点总数：{}".format(node_length))
-        for i in range(node_length):
-            item = res_json["Ret"][i]
-            node_id = item["NodeId"].lower()
-            if node_id.startswith('0x'):
-                node_id = node_id[2:]
-            node = watching_nodes.get(node_id)
-            if node is None:
-                continue
+    try:
+        res_json = json.loads(alaya_nodes())
+        node_length = len(res_json["Ret"])
+        if res_json["Code"] == 0 and node_length > 0:
+            time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+            print(time_str, "节点总数：{}".format(node_length))
+            for i in range(node_length):
+                item = res_json["Ret"][i]
+                node_id = item["NodeId"].lower()
+                if node_id.startswith('0x'):
+                    node_id = node_id[2:]
+                node = watching_nodes.get(node_id)
+                if node is None:
+                    continue
 
-            if node.rank == 0:
-                """节点信息没有初始化"""
-                ret_node = init_node(node, item, i)
-                if ret_node is not None:
-                    watching_nodes[item["NodeId"]] = ret_node
-                continue
+                if node.rank == 0:
+                    """节点信息没有初始化"""
+                    ret_node = init_node(node, item, i)
+                    if ret_node is not None:
+                        watching_nodes[item["NodeId"]] = ret_node
+                    continue
 
-            diff = get_diff(node, item, i)
-            if diff is None:
-                continue
+                diff = get_diff(node, item, i)
+                if diff is None:
+                    continue
 
-            shares_increase_threshold = int(cf.get('alert_type', 'shares_increase_threshold')) * 10**18
-            shares_reduce_threshold = int(cf.get('alert_type', 'shares_reduce_threshold')) * 10**18
-            if 0 < shares_increase_threshold <= diff.shares_diff:
-                send_msg("你的节点{}质押加被委托量正在上升，现在质押加被委托量为{:.3f}ATP！"
-                         .format(node.name, (node.shares+diff.shares_diff) / 10 ** 18),
-                         ding_address=[node.dingding], mail_address=node.mail, mail_name=node.name)
-                node.shares = int(item["Shares"], 16)
-            elif abs(diff.shares_diff) >= shares_reduce_threshold > 0 > diff.shares_diff:
-                send_msg("你的节点{}质押加被委托量正在降低，现在质押加被委托量为{:.3f}ATP！"
-                         .format(node.name, (node.shares+diff.shares_diff) / 10**18),
-                         ding_address=[node.dingding], mail_address=node.mail, mail_name=node.name)
-                node.shares = int(item["Shares"], 16)
-            # 排名上升达到阈值进行提醒，-1表示永不提醒
-            rank_increase_threshold = int(cf.get('alert_type', 'rank_increase_threshold'))
-            # 排名下降达到阈值后进行提醒，-1为不提醒
-            rank_reduce_threshold = int(cf.get('alert_type', 'rank_reduce_threshold'))
-            if diff.rank_diff >= rank_increase_threshold > 0:
-                send_msg("你的节点{}排名正在升高，现在的排名为{}！".format(node.name, node.rank),
-                         ding_address=[node.dingding], mail_address=node.mail, mail_name=node.name)
-                node.rank = i + 1
-            elif abs(diff.rank_diff) >= rank_reduce_threshold > 0 > diff.rank_diff:
-                send_msg("你的节点{}排名正在下降，现在的排名为{}！".format(node.name, node.rank),
-                         ding_address=[node.dingding], mail_address=node.mail, mail_name=node.name)
-                node.rank = i + 1
-            # 排名达到阈值或阈值之后进行提醒，-1为不提醒
-            rank_threshold = int(cf.get('alert_type', 'rank_threshold'))
-            if node.rank >= rank_threshold > 0:
-                send_msg("你的节点{}排名出现异常，现在的排名为{}，请及时处理！".format(node.name, node.rank),
-                         ding_address=[node.dingding], mail_address=node.mail, mail_name=node.name)
-                node.rank = i + 1
-            # 是否对状态改变进行提醒，true为提醒，false为不提醒
-            status_enable = cf.get('alert_type', 'status_enable')
-            if status_enable.lower() == 'true' and diff.status > 0:
-                send_msg("你的节点{}状态有异常，请关注！".format(node.name),
-                         ding_address=[node.dingding], mail_address=node.mail, mail_name=node.name)
-    time.sleep(interval)
+                if 0 < shares_increase_threshold <= diff.shares_diff:
+                    """节点委托量上升，超过阈值"""
+                    send_msg("你的节点{}质押加被委托量正在上升，现在质押加被委托量为{:.3f}ATP！"
+                             .format(node.name, (node.shares + diff.shares_diff) / 10 ** 18),
+                             ding_address=[node.dingding], mail_address=node.mail, mail_name=node.name)
+                    node.shares = int(item["Shares"], 16)
+                elif abs(diff.shares_diff) >= shares_reduce_threshold > 0 > diff.shares_diff:
+                    """节点委托量下降，超过阈值"""
+                    send_msg("你的节点{}质押加被委托量正在降低，现在质押加被委托量为{:.3f}ATP！"
+                             .format(node.name, (node.shares + diff.shares_diff) / 10 ** 18),
+                             ding_address=[node.dingding], mail_address=node.mail, mail_name=node.name)
+                    node.shares = int(item["Shares"], 16)
+
+                if abs(diff.rank_diff) >= rank_increase_threshold > 0 > diff.rank_diff:
+                    """节点排名上升，超过阈值"""
+                    send_msg("你的节点{}排名正在升高，现在的排名为{}！".format(node.name, node.rank + diff.rank_diff),
+                             ding_address=[node.dingding], mail_address=node.mail, mail_name=node.name)
+                    node.rank = i + 1
+                elif diff.rank_diff >= rank_reduce_threshold > 0:
+                    """节点排名下降，超过阈值"""
+                    send_msg("你的节点{}排名正在下降，现在的排名为{}！".format(node.name, node.rank + diff.rank_diff),
+                             ding_address=[node.dingding], mail_address=node.mail, mail_name=node.name)
+                    node.rank = i + 1
+
+                if node.rank >= rank_threshold > 0:
+                    send_msg("你的节点{}排名出现异常，现在的排名为{}，请及时处理！".format(node.name, node.rank),
+                             ding_address=[node.dingding], mail_address=node.mail, mail_name=node.name)
+                    node.rank = i + 1
+
+                if status_enable.lower() == 'true' and diff.status > 0:
+                    send_msg("你的节点{}状态有异常，请关注！".format(node.name),
+                             ding_address=[node.dingding], mail_address=node.mail, mail_name=node.name)
+
+                # 对于特殊情况下的，节点状态进行更新
+                # 1、当排名上升，但上升不提示
+                if rank_increase_threshold <= 0:
+                    if diff.rank_diff < 0:
+                        node.rank = i + 1
+                # 2、当权重上升，但上升不提示
+                if shares_increase_threshold <= 0:
+                    if diff.shares_diff > 0:
+                        node.shares = int(item["Shares"], 16)
+                # 更新节点信息
+                watching_nodes[node.id] = node
+                print(json.dumps(obj=node.__dict__, ensure_ascii=False))
+        time.sleep(interval)
+    except BaseException:
+        print("error, wait and try again.")
+        time.sleep(interval)
